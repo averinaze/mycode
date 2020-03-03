@@ -1,0 +1,650 @@
+LIBNAME SAMPLE5 'J:\RETAILSME\SAMPLE5';
+LIBNAME SAMPLE2 'J:\RETAILSME\SAMPLE2';
+
+options mprint;
+options compress=on;
+
+%let dlib_cam=SAMPLE5;
+%let lsrc=library;
+%let asrc=LIBRARYASSET;
+
+libname Temp "J:\RETAILSME\SAMPLE5\Leads\Temporary";
+
+%include 'J:\RETAILSME\SAMPLE5\Initial_Macro.sas';
+/*%del_var();*/
+/*%clean_lib (Temp);*/
+/*%dir_contents(dir=J:\RETAILSME\SAMPLE5\Leads\&yymm2., ext=xlsx, dsout=xpt_sdtm);*/
+/*%dir_contents(dir=J:\RETAILSME\SAMPLE5, ext=fold, dsout=xpt_sdtm);*/
+/*%clean_dir(fpath=J:\RETAILSME\SAMPLE5\SMS, typ=);*/
+/*%del_file(fpath='J:\RETAILSME\SAMPLE5\Initial Macro.sas');*/
+
+%let diff=0; *.. <<-- diperlukan untuk back date;
+%macro declare_variable;
+data _null_;
+	call symput('var_last_eom',(intnx('month',today()-&diff.,0,'end')));	*.. <<-- tanggal terakhir dari bulan berjalan ;
+	call symput('var_begin_om',(intnx('month',today()-&diff.,1,'begin')));	*.. <<-- tanggal awal dari bulan depan ;
+	call symput('var_next_eom',(intnx('month',today()-&diff.,1,'end')));	*.. <<-- tanggal terakhir dari bulan depan ;
+	call symput('mmyyyy',put((intnx('month',today()-&diff.,-1,'same')),mmyyn6.));		*.. <<-- ambil data akhir bulan lalu;
+	call symput('mmyyyy_1',put((intnx('month',today()-&diff.,-2,'end')),mmyyn6.));
+	call symput('mmyyyy_2',put((intnx('month',today()-&diff.,-3,'end')),mmyyn6.));
+	call symput('mmyy1',put((intnx('month',today()-&diff.,0,'end')),mmyyn4.));
+	call symput('mmyy',put((intnx('month',today()-&diff.,-1,'end')),mmyyn4.));
+	call symput('mmyy_1',put((intnx('month',today()-&diff.,-2,'end')),mmyyn4.));
+	call symput('mmyy_2',put((intnx('month',today()-&diff.,-3,'end')),mmyyn4.));
+	call symput('yymm_1',put((intnx('month',today()-&diff.,-2,'end')),yymmn4.));
+	call symput('yymm',put((intnx('month',today()-&diff.,-1,'end')),yymmn4.));
+	call symput('yymm1',put((intnx('month',today()-&diff.,0,'end')),yymmn4.));
+	call symput('yymm2',put((intnx('month',today()-&diff.,1,'end')),yymmn4.));
+	call symput('yyyymm2',put((intnx('month',today()-&diff.,1,'end')),yymmn6.));
+	call symput('mmmyy2',substr(put((intnx('month',today()-&diff.,1,'end')),date7.),3,5));
+run;
+%mend declare_variable;
+
+%declare_variable;
+
+options dlcreatedir=yes;
+libname lead "J:\RETAILSME\SAMPLE5\Leads\&yymm2.";
+libname leadm1 "J:\RETAILSME\SAMPLE5\Leads\&yymm1.";
+options dlcreatedir=no;
+%let folder=J:\RETAILSME\SAMPLE5\Leads\&yymm2.;
+
+DATA blank_var;
+    length
+        Variable              $ 13
+        Content               $ 8; 
+    format
+        Variable           $CHAR13.
+        Content            $CHAR8.; 
+run;
+
+proc sql;
+create table List_var as
+select 'var_last_eom' as Variable, put(&var_last_eom.,date9.) as Content from blank_var
+union
+select 'var_begin_om' as Variable, put(&var_begin_om.,date9.) as Content from blank_var
+union
+select 'var_next_eom' as Variable, put(&var_next_eom.,date9.) as Content from blank_var
+union
+select 'mmyyyy' as Variable, %sysfunc(quote(&mmyyyy.)) as Content from blank_var
+union
+select 'mmyyyy_1' as Variable, %sysfunc(quote(&mmyyyy_1.)) as Content from blank_var
+union
+select 'mmyyyy_2' as Variable, %sysfunc(quote(&mmyyyy_2.)) as Content from blank_var
+union
+select 'mmyy1' as Variable, %sysfunc(quote(&mmyy1.)) as Content from blank_var
+union
+select 'mmyy' as Variable, %sysfunc(quote(&mmyy.)) as Content from blank_var
+union
+select 'mmyy_1' as Variable, %sysfunc(quote(&mmyy_1.)) as Content from blank_var
+union
+select 'mmyy_2' as Variable, %sysfunc(quote(&mmyy_2.)) as Content from blank_var
+union
+select 'yymm_1' as Variable, %sysfunc(quote(&yymm_1.)) as Content from blank_var
+union
+select 'yymm' as Variable, %sysfunc(quote(&yymm.)) as Content from blank_var
+union
+select 'yymm1' as Variable, %sysfunc(quote(&yymm1.)) as Content from blank_var
+union
+select 'yymm2' as Variable, %sysfunc(quote(&yymm2.)) as Content from blank_var
+union
+select 'yyyymm2' as Variable, %sysfunc(quote(&yyyymm2.)) as Content from blank_var
+union
+select 'mmmyy2' as Variable, %sysfunc(quote(&mmmyy2.)) as Content from blank_var
+;
+run;
+
+%let mmyy	=1019;
+PROC FREQ DATA=library.INSURANCE_1019; TABLE Basic_Plan_Name PRODUCT; RUN;
+Proc sql;
+create table PH_INSURANCE as
+select distinct ID, 1 as NUM,
+case  
+	when product ='PRIMA EMAS' then 'PPE'	
+	when product ='PRIMA MAXIMA' then 'PPM'	
+	when product ='PRIMA MAXIPLUS' then 'PPMP'	
+	when product ='PRIMA OPTIMA' then 'PPO'	
+	when product ='PRIMA RENCANA' then 'PPR'	
+	when product ='PRIMA RENCANA ABSOLUT' then 'PPRA'	
+	when product ='PRIMA RENCANA FLEXI' then 'PPRF'	
+	when Basic_Plan_Name ='Proteksi Prima Medika' then 'PPMEUL'	
+else product end as product, group_product
+from library.INSURANCE_&mmyy.
+where ID not in (.,0)
+and STATUS='ACTIVE';
+quit;
+
+%put &mmyy.;
+
+Proc sql;
+create table PH_INS_TELE as
+select distinct ID1 as ID, 1 as NUM, 
+case when product='PPM' then 'PPME' else product end as product, 'TELE' as  group_product
+from library.INS_TELE_&mmyy.
+where  ID1 not in (.,0)
+and STATUS='ACTIVE';
+quit;
+
+
+Proc sql;
+create table PH_INS_BRANCH as
+select distinct ID1 as ID, 1 as NUM, 
+case when TIPE='1' then 'PJ Branch'
+	 when TIPE='100' then 'PJ Branch'
+	 when TIPE='505' then 'TPD'
+end as product,
+'BRANCH' as  group_product
+from library.INS_BRANCH_&mmyy._new
+where  ID1 not in (.,0)
+and STATUS='Active';
+quit;
+
+
+Proc sql;
+create table PH_INS_PPA as
+select distinct ID as ID, 1 as NUM, 
+'PPA' as product,
+'PPA' as  group_product
+from SAMPLE5.INS_PPA_&yymm_1.
+where  ID not in (.,0)
+and pol_status=0;
+quit;
+
+
+data PH_PRODUCT;
+set PH_INSURANCE PH_INS_TELE PH_INS_BRANCH PH_INS_PPA; 
+run;
+
+%macro transpose(Col1=, var1=, num=, table=, out=work.transpose);
+proc sql noprint; select cat(count(distinct &var1.)) into: n_type from &table.; quit;
+proc sql noprint; select distinct &var1. into:variable1 thru: variable&n_type. from &table.; quit;
+proc sql;
+create table &out. as select 
+&Col1., 
+	%do i=1 %to &n_type.;
+		coalesce(max(case when &var1.="&&&variable&i." then &num. end),0) as "&&&variable&i."n
+		%if &i.^=&n_type. %then ,;
+	%end;
+from &table.
+group by &Col1.
+;quit;
+%mend transpose;
+
+%transpose(Col1=ID, var1=product, num=NUM, table=PH_PRODUCT, out=PH_PRODUCT2);
+
+%transpose(Col1=ID, var1=group_product, num=NUM, table=PH_PRODUCT, out=PH_GRPPRODUCT2);
+
+
+data OTHER_PH_INS;
+set liab_wrk.PRODUCT_HOLDING_NEW_1019_V5;
+keep
+ID
+DBD
+TYPHUS
+ACE
+TRAVEL_INSURANCE
+CREDIT_SHIELD
+LIFE_INSURANCE
+FIRE_INSURANCE
+;
+where
+sum (DBD,
+TYPHUS,
+ACE,
+TRAVEL_INSURANCE,
+CREDIT_SHIELD,
+LIFE_INSURANCE,
+FIRE_INSURANCE
+)>0;
+RENAME LIFE_INSURANCE=ASJI FIRE_INSURANCE=ASKEB;
+run;
+
+data PH_BA;
+merge
+PH_GRPPRODUCT2 (drop=TELE)
+PH_PRODUCT2
+;by ID;
+array num _numeric_;
+do over num;
+	if num=. then num=0;
+end;
+SUM_PH_INS=sum(
+max(BRANCH PJ100),
+PPD,
+PPH,
+PPME,
+PPS,
+PPSI,
+SPUL,
+RPUL,
+PPA,
+OTHERS);
+run;
+
+proc sort data=PH_BA nodupkey; by ID; run;
+proc freq data=ph_ba; table
+OTHERS	BRANCH	PPA	RPUL	SPUL	'PJ Branch'n	PJ100	PPD	PPE	PPH	PPM	PPME	PPMEUL	PPMP	PPO	PPR	PPRA	PPRF	PPS	PPSI	TPD
+;run;
+data ph_ba; set ph_ba;
+UL=Max(PPE,PPM,PPMP,PPO,PPR,PPRA,PPRF,PPMEUL,RPUL,RPUL);
+Non_UL=Max(OTHERS,BRANCH,PPA,'PJ Branch'n,PJ100,PPD,PPH,PPME,PPS,PPSI,TPD);
+run;
+
+data ph_ba; set ph_ba;
+rename ID=ID_ba;
+run;
+options mprint;
+options compress=on;
+
+%let yymm_1	=1909;
+%let mmyy	=1019;
+%let mmyy_1	=0919;
+%let mmyyyy	=102019;
+%let yymm	=1911;
+%let lsrc	=library;
+%dir_contents(dir=J:\RETAILSME\SAMPLE5\, ext=fold, dsout=xpt_sdtm);
+proc sql;
+create table CasaTD as
+select ID,cod_lob,IDRbalance, AvgBalance from &lsrc..casa_&mmyyyy._new 
+where cod_lob in (12,13,31) and 
+ProductCode not in (360,361,362,401,370,371,372,390,410,420,569,570,585,615,616,617,618,619,620,621,622,623,624,625,626,481,499,516,519,520,521,442,443,444,445,446,447,448,449,450,511,514,518,578,605,606,607,608,609,612,613,614)
+and COD_ACCT_STAT not in (1,5) and idrbalance > 0
+union all
+select ID,cod_lob,IDRbalance, AvgBalance from &lsrc..TD_&mmyyyy.
+where cod_lob in (12,13,31) and 
+ProductCode not in(152,164,230,116,117,118,119,120,212,247,266,275,288,295,135,236,264,281,282,283,292,293,294,74)
+and COD_ACCT_STAT not in (1,5); 
+quit;
+
+proc sql;
+create table BALcust_&mmyyyy. as
+select ID, Sum(IDRbalance) as IDRbalance,sum(AvgBalance) as BAL_&mmyyyy.
+from CasaTD where cod_lob in (12,13)
+group by ID;
+quit;
+
+proc sql;
+create table BALcust_sme_&mmyyyy. as
+select ID, Sum(IDRbalance) as IDRbalance,sum(AvgBalance) as BAL_&mmyyyy.
+from CasaTD where cod_lob in (31)
+group by ID;
+quit;
+
+
+Proc sql;
+Create table casa_nonca_&mmyyyy. as
+select ID, AccountNumber, c.BAL_BOOK as bal_today, b.CAN_BE_SOURCE_ACCT,
+case when  a.cod_lob in (12,13) then 'Retail'
+	 when  a.cod_lob in (31) then 'SME'
+end as LOB
+from &lsrc..casa_&mmyyyy._new a
+left join &dlib_cam..Campaign_prod_mast b on a.ProductCode=b.COD_PROD and a.ProductGroup=b.Acct_Type
+left join MISDAILY.BD_MIS_CH_ACCT_MAST c on a.AccountNumber=input(c.COD_ACCT_NO,12.)
+where a.ProductGroup ne 'CA' and a.cod_lob in (12,13,31) and 
+a.idrbalance > 50e3 and c.COD_ACCT_STAT in (6,7,8) and 
+a.AcctCurrency eq 'IDR' and 
+a.productcode not in (360,361,362,390,410,401,403,434,435,414,437,364,365,368,370,371,372,603,610,630,631,632,633,634,635,636,637,638,639,641,442,443,444,445,446,447,448,449,450,511,514,518,578,605,606,607,608,609,612,613,614,
+420, 481, 499, 516, 519, 520, 521, 569, 570, 585, 615, 616, 617, 618, 619, 620, 621, 622, 623, 624, 625, 626)
+and custrelation='SOW';
+quit;
+
+proc sort data=casa_nonca_&mmyyyy.; by ID descending CAN_BE_SOURCE_ACCT descending bal_today ;run;
+proc sort data=casa_nonca_&mmyyyy. nodupkey;by ID;run;
+
+data 
+	casa_debit
+	casa_debit_SME; 
+set casa_nonca_&mmyyyy;
+		ACCOUNT_NUMBER1= compress(ACCOUNTNUMBER);
+		ACCOUNT_NUMBER1= right(ACCOUNT_NUMBER1);
+		ACCOUNT_NUMBER_Masking = substr(ACCOUNT_NUMBER1,9,4);
+		drop ACCOUNT_NUMBER1;
+	IF LOB='Retail' then output casa_debit;
+	IF LOB='SME' then output casa_debit_SME;
+		keep ID ACCOUNTNUMBER ACCOUNT_NUMBER_Masking LOB bal_today CAN_BE_SOURCE_ACCT;
+run;
+proc sort data=casa_debit nodupkey;by ID;
+proc sort data=casa_debit_SME nodupkey;by ID;
+run;
+
+
+/**********************************************************/
+
+proc sql;
+create table BAL_&mmyyyy as
+select a.ID
+	, a.CUSTOMER_ID as ID_DUMMY
+	, a.custname
+	, a.custopendate2
+	, a.custdob2
+	, a.MOB
+	, a.age
+	, intck('month', a.CustDOB2, &var_next_eom)/12 as Age_leads1 format comma10.2
+	, floor(intck('month', a.CustDOB2, &var_next_eom)/12) as Age_leads2 format 10.
+	, a.custsex
+	, a.custmaritalstatus
+	, g.REF_RES_PHONE_AREA as HomePhone_Area 
+	, a.custhomephone
+	, g.REF_OFFICE_PHONE_AREA as OfficePhone_Area
+	, a.custofficephone
+	, a.custmobilephone
+	, a.emailaddress
+	, a.acctbranchcode
+	, case when a.ProductCode in (422,424,425,458,459) then 'DL' else 'NL' end as ProdGroup
+	, a.ProductCode
+	, a.productname
+	, a.product
+	, a.acctofficer
+	, a.acctofficer2
+	, a.accountnumber
+	, substr(put(a.accountnumber,z12.),9,4) as ACCOUNT_NUMBER_Masking
+	, a.acctopendate
+	, a.id_identitas as id_type
+	, a.custidnumber as id_number
+	, case when a.custaddress1 = '' then a.alternateaddress else a.custaddress1 end as address1
+	, case when a.custaddress1 = '' then a.alternateaddress1 else a.custaddress2 end as address2
+	, case when a.custaddress1 = '' then a.alternateaddress2 else a.custaddress3 end as address3
+	, case when a.custaddress1 = '' then a.alternateaddresscity else a.custcity end as city
+	, case when a.custaddress1 = '' then a.alternateaddressprovince else a.custprovince end as province
+	, case when a.custaddress1 = '' then a.alternateaddresspostalcode else a.custpostalcode end as postal_code
+	, a.CustFlag
+	, a.CustStaff
+	, a.AcctStatus
+	, a.cod_lob
+	, a.lob
+	, a.CustRelation
+	, a.AcctCurrency
+	, case when a.idrbalance is null then 0 else a.idrbalance end as CASA_OS
+	, case when a.avgbalance is null then 0 else a.avgbalance end as CASA
+	,coalesce(b.IDRbalance,c.IDRbalance) as BAL_OS
+	,coalesce(b.BAL_&mmyyyy,c.BAL_&mmyyyy) as BAL
+	,coalesce(d.bal_today,e.bal_today) as bal_today
+	,coalesce(d.accountnumber,e.accountnumber) as accountnumber2
+	,coalesce(d.ACCOUNT_NUMBER_Masking,e.ACCOUNT_NUMBER_Masking) as ACCOUNT_NUMBER_Masking2
+	,coalesce(d.CAN_BE_SOURCE_ACCT,e.CAN_BE_SOURCE_ACCT) as CAN_BE_SOURCE_ACCT
+	,coalesce(d.LOB,e.LOB) as LOB2
+	,a.Extract_Flag
+	,a.Komunikasi_pribadi
+	,a.CustomerNationality
+from &lsrc..casa_&mmyyyy._new a
+left join BALcust_&mmyyyy b on a.ID = b.ID and cod_lob in (12,13)
+left join BALcust_sme_&mmyyyy c on a.ID = c.ID and cod_lob in (31)
+left join casa_debit d on a.ID = d.ID and a.accountnumber=d.accountnumber and cod_lob in (12,13)
+left join casa_debit_sme e on a.ID = e.ID and a.accountnumber=e.accountnumber and cod_lob in (31)
+left join MISDAILY.BD_CI_CUSTMAST g on a.ID=g.COD_CUST_ID
+where cod_lob in (12,13,31) 
+and (a.idrbalance>=0 and a.COD_ACCT_STAT not in (1,5)) and not (a.idrbalance<=0 and a.COD_ACCT_STAT=7)
+and prxmatch("m/PRIMA AMANAH|VIRTUAL/oi",productname)=0
+;
+quit;
+
+
+data BAL_idr_raw;
+set BAL_&mmyyyy;
+where AcctCurrency eq 'IDR';
+run;
+
+data BAL_custrel_raw;
+set BAL_idr_raw;
+where CustRelation in ('SOW');
+run;
+
+%macro BAL_not360_raw(seg,lob_cd);
+Proc sql;
+Create table BAL_not360_raw_&seg. as
+select a.* from BAL_custrel_raw a
+left join SAMPLE5.Campaign_prod_mast b on a.ProductCode=b.COD_PROD
+left join misdaily.BD_CH_PROD_MAST c on a.ProductCode=c.COD_PROD
+where a.productcode not in 
+(360,361,362,390,410,401,403,434,435,414,437,456,364,365,368,370,371,372,603,610,630,631,632,633,634,635,636,637,638,639,641,442,443,444,445,446,447,448,449,450,511,514,518,578,605,606,607,608,609,612,613,614,
+420, 481, 499, 516, 519, 520, 521, 569, 570, 585, 615, 616, 617, 618, 619, 620, 621, 622, 623, 624, 625, 626)
+and ProductName not like '%MUFG%'
+and c.FLG_RD='N' 
+and cod_lob in (&&lob_cd.);
+quit;
+proc sort data=BAL_not360_raw_&seg.;by ID descending accountnumber2;run;
+proc sort data=BAL_not360_raw_&seg. out=BAL_not360_ID_&seg. nodupkey;by ID;run;
+
+Proc sql;
+Create table BAL_not360_rawRD_&seg. as
+select a.* from BAL_custrel_raw a
+left join SAMPLE5.Campaign_prod_mast b on a.ProductCode=b.COD_PROD
+left join misdaily.BD_CH_PROD_MAST c on a.ProductCode=c.COD_PROD
+where a.productcode not in 
+(390,410,401,403,434,435,414,437,456,603,610,630,631,632,633,634,635,636,637,638,639,641,442,443,444,445,446,447,448,449,450,511,514,518,578,605,606,607,608,609,612,613,614,
+420, 481, 499, 516, 519, 520, 521, 569, 570, 585)
+and ProductName not like '%MUFG%'
+and c.FLG_RD not in ('N') 
+and cod_lob in (&&lob_cd.);
+quit;
+proc sort data=BAL_not360_rawRD_&seg.;by ID descending accountnumber2;run;
+proc sort data=BAL_not360_rawRD_&seg. out=BAL_not360_IDRD_&seg. nodupkey;by ID;run;
+
+%mend BAL_not360_raw;
+%let lob1=12 13;
+%BAL_not360_raw(RB,&lob1.);
+
+%let lob2=31;
+%BAL_not360_raw(SME,&lob2.);
+
+data BAL_not360_raw;
+set BAL_not360_raw_RB BAL_not360_raw_SME;
+run;
+data BAL_not360rd_raw;
+set BAL_not360_rawRD_RB BAL_not360_rawRD_SME;
+run;
+proc sql;
+	create table BAL_not360rd_raw as select * from BAL_not360rd_raw where accountnumber2 not in 
+	(select accountnumber2 from BAL_not360_raw);
+quit;
+data BAL_not360_raw2;
+set BAL_not360_raw BAL_not360rd_raw;
+run;
+
+data BAL_not360_ID;
+set BAL_not360_ID_RB BAL_not360_ID_SME;
+run;
+proc sort data=BAL_not360_ID nodupkey;by ID;
+run;
+data BAL_not360_IDRD;
+set BAL_not360_IDRD_RB BAL_not360_IDRD_SME;
+run;
+proc sort data=BAL_not360_IDRD nodupkey;by ID;
+run; /*1,084*/
+proc sql;
+	create table BAL_not360_IDRD as select * from BAL_not360_IDRD where ID not in 
+	(select ID from BAL_not360_ID);
+quit; /*339*/
+data BAL_not360_ID2; set BAL_not360_ID (in=a) BAL_not360_IDRD (in=b);
+if a then Flag_RD='N';
+if b then Flag_RD='Y';
+run;
+proc sort data=BAL_not360_ID2 nodupkey;by ID;
+run; /*1,067,643*/
+proc freq data=BAL_not360_ID2; table Flag_RD; run;
+
+
+data BAL_personal;
+set BAL_not360_ID2;
+where CustFlag in ('A - Personal, Pajak');
+run;
+
+data BAL_non_jpn;
+set BAL_personal;
+where customernationality^='JP';
+run;
+
+Proc sql;
+create table BAL_nstaf as
+select * 
+from BAL_non_jpn
+where CustStaff eq 'N' and custname ne 'EMPLOYEE'
+and ID not in (select ID from SAMPLE2.Vip_danamon_&mmyy.
+				union all
+				select ID from SAMPLE2.Staff_ADIRA_&yymm_1.)
+;
+run;
+
+
+data Cust_eligible_BAL;
+set BAL_nstaf;
+format Flag_BAL_OS $100.;
+if BAL_OS<=50e3 then Flag_BAL_OS='A. Below 50 K';
+if BAL_OS>=500e6 then Flag_BAL_OS='B. Above 500 Mn';
+if 50e3<BAL_OS<500e6 then Flag_BAL_OS='C. 50 K - 500 Mn';
+if BAL>500e6 then Flag_BAL='A. Above 500 Mn';
+if BAL<=500e6 then Flag_BAL='B. <=500 Mn';
+run;
+
+data Cust_BAL500m;
+set Cust_eligible_BAL;
+where 21<age<64;
+run;
+
+data Cust_valid_phone;
+set Cust_eligible_BAL;
+IF (input(compress(CustHomePhone,'0123456789','k'),13.)>1000 and length(CustHomePhone)>5 and length(CustHomePhone)<9 and length(cat(input(HomePhone_Area,5.)))>=2) then HomePhone2=cat(input(HomePhone_Area,5.))||CustHomePhone;
+else HomePhone2=CustHomePhone;
+IF (input(compress(CustOfficePhone,'0123456789','k'),13.)>1000 and length(CustOfficePhone)>5 and length(CustOfficePhone)<9 and length(cat(input(OfficePhone_Area,5.)))>1) then OfficePhone2=cat(input(OfficePhone_Area,5.))||CustOfficePhone;
+else OfficePhone2=CustOfficePhone;
+run;
+
+%include 'J:\RETAILSME\SAMPLE5\Cleansing_Phone.sas';
+
+%cleansing_phone (Cust_valid_phone, Cust_valid_phone, HomePhone2, CustHomePhone, VT0);
+%cleansing_phone (Cust_valid_phone, Cust_valid_phone, OfficePhone2, CustOfficePhone, VT0);
+%cleansing_phone (Cust_valid_phone, Cust_valid_phone, CustMobilePhone, CustMobilePhone, VT0);
+
+
+libname leadm1 "J:\RETAILSME\SAMPLE5\Leads\&yymm.";
+libname lead "J:\RETAILSME\SAMPLE5\Leads\&yymm.";
+
+data Cust_valid_phone;
+set Cust_valid_phone;
+IF (FL_V_CustMobilePhone=1 or (FL_V_HomePhone2=1 and upcase(compress(TYPE_HomePhone2))='MOBILE')) then VALID_PHONE=1; else VALID_PHONE=0;
+drop
+	HomePhone_Area OfficePhone_Area HomePhone2 OfficePhone2 
+	FL_V_HomePhone2 FL_V_OfficePhone2 FL_V_CustMobilePhone 
+	TYPE_HomePhone2 TYPE_OfficePhone2 TYPE_CustMobilePhone	;
+run;
+
+data Cust_valid_mail;
+set Cust_valid_phone;
+MAIL_CLEAN=compress(upcase(emailaddress));
+MAIL_CLEAN= TRANSLATE(MAIL_CLEAN,".",",");
+MAIL_CLEAN= TRANSTRN(COMPRESS(MAIL_CLEAN), "..", ".");
+MAIL_CLEAN= SUBSTR(MAIL_CLEAN,1, FIND(MAIL_CLEAN, '@')-1)
+	||TRANSLATE(SUBSTR(MAIL_CLEAN, FIND(MAIL_CLEAN, '@'), LENGTH(MAIL_CLEAN)-FIND(MAIL_CLEAN,'@')+1),"-","_");
+IF find(scan(MAIL_CLEAN,-1,'@'),'.')=0 or 
+scan(lowcase(MAIL_CLEAN),-1,'@') in (
+							'yahoo.coom'
+							'yahoo.co'
+							'yahoo.copm'
+							'yahooo.com'
+							'yamil.com'
+							'yhaoo.com'
+							'y7mail.com'
+							'yaho.co.id'
+							'yaho.com'
+							'yaho0.com'
+							'yahoo.c.id'
+							'yahooco.id'
+							'yhaoo.co.id'
+							'hotamail.com'
+							'hotamall.com'
+							'hotmali.com'
+							'gmai.com'
+							'gemail.com'
+							'gmil.com'
+							'gmail.cpm'
+							'gamail.com'
+							'gamil.com'
+							'gmail.coom'
+							'gmailc.om'
+							'!gmail.com'
+							'9.mail.com'
+							'gmail.cm'
+							'gmail.om'
+							'gmail.xom'
+							'gmailcom'
+							'gmaill.com'
+							'gmal.com'
+							'gmauil.com'
+							'gmial.com'
+							'gmmail.com'
+							'roketmail.com'
+							'rocketmall.com'
+							'roeketmail.com')
+then VALID_EMAIL=0; else VALID_EMAIL=1;
+run;
+
+
+
+data BAL_age_raw;
+set Cust_valid_mail;
+where 21<age<64;
+run;
+data BAL_age_raw; set BAL_age_raw;
+if Flag_BAL='' then Flag_BAL='B. <=500 Mn'; else Flag_BAL=Flag_BAL;
+run;
+proc freq data=BAL_age_raw; table Flag_BAL; run;
+
+/*528219*/
+
+proc sql;
+	create table BAL_4_rem_complaint2 as
+	select *
+	from BAL_age_raw
+	where ID not in (
+				select ID from SAMPLE2.complaint_cust)
+	;
+quit;
+
+/************************************************************************/
+proc sort data=BAL_4_rem_complaint2; by ID; run;
+
+
+
+/*WATERFALL RETAIL*/
+PROC SQL NOPRINT;
+   CREATE TABLE waterfall AS
+   SELECT "BASE ACCOUNT EXCLUDE DORMANT ZERO          " AS CRITERIA, COUNT(*) AS TOTAL FROM BAL_&mmyyyy
+   UNION ALL
+   SELECT "EXCLUDE FCY ACCOUNT           " AS CRITERIA, COUNT(*) AS TOTAL FROM BAL_idr_raw
+   UNION ALL
+   SELECT "EXCLUDE JOINT ACCOUNT           " AS CRITERIA, COUNT(*) AS TOTAL FROM BAL_custrel_raw
+   UNION ALL
+   SELECT "EXCLUDE MUFG & RD ACCOUNT (TPD, TACIT, SUPER COMBO, etc.)" AS CRITERIA, COUNT(*) AS TOTAL FROM BAL_not360_raw2
+   UNION ALL
+   SELECT "CUSTOMER LEVEL       " AS CRITERIA, COUNT(*) AS TOTAL FROM BAL_not360_ID2
+   UNION ALL
+   SELECT "EXCLUDE NON PERSONAL       " AS CRITERIA, COUNT(*) AS TOTAL FROM BAL_personal
+   UNION ALL
+   SELECT "EXCLUDE JAPANESE       " AS CRITERIA, COUNT(*) AS TOTAL FROM BAL_non_jpn
+   UNION ALL
+   SELECT "EXCLUDE STAFF       " AS CRITERIA, COUNT(*) AS TOTAL FROM BAL_nstaf
+   UNION ALL
+   SELECT "EXCLUDE BAL<50K AND BAL>500MIO       " AS CRITERIA, COUNT(*) AS TOTAL FROM Cust_eligible_BAL
+   UNION ALL
+   SELECT "EXCLUDE AGE<21 AND AGE>64       " AS CRITERIA, COUNT(*) AS TOTAL FROM  BAL_age_raw
+   UNION ALL 
+   SELECT "EXCLUDE COMPLAINT CUST       " AS CRITERIA, COUNT(*) AS TOTAL FROM  BAL_4_rem_complaint2
+   UNION ALL
+   SELECT "KOMUNIKASI PRIBADI=YES       " AS CRITERIA, COUNT(*) AS TOTAL FROM  BAL_4_rem_complaint2 where Komunikasi_Pribadi^=2
+   UNION ALL
+   SELECT "HAVE VALID PHONE      " AS CRITERIA, COUNT(*) AS TOTAL FROM  BAL_4_rem_complaint2 where Komunikasi_Pribadi^=2 and (VALID_PHONE=1)
+
+   ;
+QUIT;
+
+
+proc summary data= BAL_4_rem_complaint2 nway missing;
+class Flag_Priority Flag_RD Flag_BAL_OS Flag_BAL UL	Non_UL TELE PH_INS A_4W	A_2W	DL	DL_Syariah	CC Have_NonRD_SA
+Tier_UL	Tier_NonUL tier_Age	Tier_AllINS tier_MOB	tier_CurrOnBal	tier_BalRD	tier_BalNonRD	tier_HighestOnL12M	tier_HighestOnL6M	tier_HighestOnL3M
+Extract_Flag Komunikasi_Pribadi VALID_EMAIL
+OTHERS	BRANCH	PPA	RPUL	SPUL	'PJ Branch'n	PJ100	PPD	PPE	PPH	PPM	PPME	PPMEUL	PPMP	PPO	PPR	PPRA	PPRF	PPS	PPSI	TPD	
+;var MOB	Age BAL_OS Avg_BAL SUM_PH_INS highest_l12m highest_l6m highest_l3m balance_RD	balance_NonRD;
+output out=summary_base2020 (drop=_type_ rename=_freq_=ID)sum=;
+run;
+
+
+
